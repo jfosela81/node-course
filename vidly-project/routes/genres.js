@@ -2,22 +2,16 @@
  * Created by jorgefosela on 30/4/20.
  */
 
+const mongoose = require('mongoose');
 const Joi = require( 'joi' );
 const express = require( 'express' );
 const router = express.Router();
 
-const mongoose = require('mongoose');
-mongoose.connect('mongodb://localhost/vidly-project')
-  .then( () => console.log('Connected to vidly...'))
-  .catch( (err) => console.log(err.message) );
-
-const genreSchema = mongoose.Schema({
+const Genre = new mongoose.model('Genre', new mongoose.Schema({
   name: String
-});
+}));
 
-const Genre = mongoose.model('Genre', genreSchema);
-
-async function getGenres( sort = '' ) {
+/* async function getGenres( sort = '' ) {
 
   const genres = await Genre
     .find()
@@ -25,7 +19,7 @@ async function getGenres( sort = '' ) {
     .select( { name: 1 } );
   return genres;
 
-}
+} */
 
 async function getGenreById( id ) {
 
@@ -68,9 +62,10 @@ async function deleteGenre( id ) {
 
 }
 
-router.get( '/', ( req, res ) => {
+router.get( '/', async ( req, res ) => {
 
-  getGenres(req.query.sortBy).then( (genres) => res.send(genres) );
+  const genres = await Genre.find().sort('name');
+  res.send(genres);
 
 });
 
