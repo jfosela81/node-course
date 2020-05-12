@@ -6,60 +6,95 @@ const Joi = require( 'joi' );
 const express = require( 'express' );
 const router = express.Router();
 
-const genres = [
-  { id: 1, name: 'Sci-fi' },
-  { id: 2, name: 'Western' },
-  { id: 3, name: 'Comedy' },
-  { id: 4, name: 'Horror' }
-];
+const mongoose = require('mongoose');
+mongoose.connect('mongodb://localhost/vidly-project')
+  .then( () => console.log('Connected to vidly...'))
+  .catch( (err) => console.log(err.message) );
+
+const genreSchema = mongoose.Schema({
+  name: String
+});
+
+const Genre = mongoose.model('Genre', genreSchema);
+
+async function getGenres( sort = '' ) {
+
+  const genres = await Genre
+    .find()
+    .sort(sort)
+    .select( { name: 1 } );
+  return genres;
+
+}
+
+async function getGenreById( id ) {
+
+  const genre = await Genre
+    .find( { _id: id } )
+    .select( { name: 1 } );
+
+  return genre;
+}
+
+async function createGenre( body ) {
+
+  const genre = new Genre({
+    name: body.name
+  });
+
+  return await genre.save();
+
+}
+
+async function updateGenre( id, body ) {
+
+  const genre = await Genre.findByIdAndUpdate(
+    { _id: id },
+    {
+      $set: { name: body.name }
+    },
+    {
+      new: true
+    }
+  );
+
+  return genre;
+
+}
+
+async function deleteGenre( id ) {
+
+  return await Genre.findByIdAndRemove( id );
+
+}
 
 router.get( '/', ( req, res ) => {
 
-  if ( req.query.sortBy === 'name' ) {
-
-    let genres_ordered = genres.slice(); // Hacemos una copia del array original
-    genres_ordered = genres_ordered.sort( (el1, el2) => {
-      let x = el1.name.toLowerCase();
-      let y = el2.name.toLowerCase();
-
-      if ( x < y ) return -1;
-      if ( x > y ) return 1;
-      return 0;
-    });
-
-    res.send( genres_ordered );
-
-  } else {
-
-    res.send( genres );
-
-  }
+  getGenres(req.query.sortBy).then( (genres) => res.send(genres) );
 
 });
 
 router.get( '/:id', ( req, res ) => {
 
-  const genre = genres.find( single_genre => single_genre.id === parseInt( req.params.id ) );
-
-  if ( ! genre ) {
-    res.status(404).send('No genre found');
-    return;
-  }
-
-  res.send( genre );
-
+  getGenreById( req.params.id )
+    .then( (genre) => res.send( genre ) )
+    .catch( (err) => {
+      res.status(404).send('No genre found');
+      return;  
+    });
+    
 });
 
 router.get( '/name/:name', ( req, res ) => {
 
-  const genre = genres.find( single_genre => single_genre.name.toLowerCase() === req.params.name.toLowerCase() );
+/*   const genre = genres.find( single_genre => single_genre.name.toLowerCase() === req.params.name.toLowerCase() );
 
   if ( ! genre ) {
     res.status(404).send('No genre found');
     return;
   }
 
-  res.send( genre );
+  res.send( genre ); */
 
 });
 
@@ -72,13 +107,7 @@ router.post( '/', ( req, res ) => {
     return;
   }
 
-  const genre = {
-    id: genres.length + 1,
-    name: req.body.name
-  };
-
-  genres.push(genre);
-  res.send(genre);
+  res.send( createGenre( req.body ) );
 
 });
 
@@ -91,32 +120,17 @@ router.put( '/:id', ( req, res ) => {
     return;
   }
 
-  const element = genres.find( g => g.id === parseInt( req.params.id ) );
-
-  if ( element ) {
-    element.name = req.body.name;
-    res.send( genres );
-
-  } else {
-    return res.status(404).send( 'Genre not found!' );
-  }
+  updateGenre( req.params.id, req.body )
+    .then( (genre) => res.send( genre ) )
+    .catch( (err) => res.status(404).send( 'Genre not found!' ) );
 
 });
 
 router.delete( '/:id', ( req, res ) => {
 
-  const element = genres.find( g => g.id === parseInt( req.params.id ) );
-
-  if ( element ) {
-
-    const indexOf = genres.indexOf(element);
-
-    genres.splice( indexOf, 1 );
-    res.send( genres );
-
-  } else {
-    return res.status(404).send( 'Genre not found!' );
-  }
+  deleteGenre( req.params.id )
+    .then( (result) => result ? res.send( result ) : res.status(404).send('Document not found!') )
+    .catch( (err) => res.status(400).send(err.message) );
 });
 
 function validateGenre( genre ) {
